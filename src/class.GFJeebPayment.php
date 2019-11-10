@@ -12,6 +12,10 @@ class GFJeebPayment
     public $total;          // Displays Total
     public $buyer_email;    // Displays Customer's EmaiL
 
+    const PLUGIN_NAME = 'gravityforms';
+    const PLUGIN_VERSION = '3.0';
+    const BASE_URL = "https://core.jeeb.io/api/";
+
     /**
      * Writes $contents to system error logger.
      *
@@ -33,14 +37,15 @@ class GFJeebPayment
         error_log($contents);
     }
 
-    public function convertIrrToBtc($url, $amount, $signature, $baseCur) {
+    public function convertIrrToBtc($amount, $signature, $baseCur) {
 
         // return Jeeb::convert_irr_to_btc($url, $amount, $signature);
-        $ch = curl_init($url.'currency?'.$signature.'&value='.$amount.'&base='.$baseCur.'&target=btc');
+        $ch = curl_init(self::BASE_URL.'currency?'.$signature.'&value='.$amount.'&base='.$baseCur.'&target=btc');
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-          'Content-Type: application/json')
+          'Content-Type: application/json',
+          'User-Agent:'.self::PLUGIN_NAME . '/' . self::PLUGIN_VERSION)
       );
 
       $result = curl_exec($ch);
@@ -52,17 +57,18 @@ class GFJeebPayment
       }
 
 
-      public function createInvoice($url, $amount, $options = array(), $signature) {
+      public function createInvoice($options = array(), $signature) {
 
           $post = json_encode($options);
 
-          $ch = curl_init($url.'payments/' . $signature . '/issue/');
+          $ch = curl_init(self::BASE_URL.'payments/' . $signature . '/issue/');
           curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
           curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
           curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
           curl_setopt($ch, CURLOPT_HTTPHEADER, array(
               'Content-Type: application/json',
-              'Content-Length: ' . strlen($post))
+              'Content-Length: ' . strlen($post),
+              'User-Agent:'.self::PLUGIN_NAME . '/' . self::PLUGIN_VERSION)
           );
 
           $result = curl_exec($ch);
@@ -73,10 +79,10 @@ class GFJeebPayment
 
       }
 
-      public function redirectPayment($url, $token) {
+      public function redirectPayment($token) {
         error_log("Entered into auto submit-form");
         // Using Auto-submit form to redirect user with the token
-        echo "<form id='form' method='post' action='".$url."payments/invoice'>".
+        echo "<form id='form' method='post' action='".self::BASE_URL."payments/invoice'>".
                 "<input type='hidden' autocomplete='off' name='token' value='".$token."'/>".
                "</form>".
                "<script type='text/javascript'>".
@@ -97,7 +103,6 @@ class GFJeebPayment
             // price
             $price = number_format($this->total, 2, '.', '');
 
-            $baseUri      = "https://core.jeeb.io/api/" ;
             $signature    = get_option('jeebSignature');
             $callBack     = get_option('jeebRedirectURL');
             $notification = get_option('siteurl').'/?jeeb_callback=true';
@@ -112,7 +117,8 @@ class GFJeebPayment
                             'Ltc',
                             'Bch',
                             'Eth',
-                            'TestBtc'
+                            'TestBtc',
+                            'TestLtc'
                            );
 
             foreach ($params as $p) {
@@ -128,32 +134,23 @@ class GFJeebPayment
             error_log($this->uid." ".$baseUri." ".$signature." ".$callBack." ".$notification." ". $baseCur);
             error_log("target cur = ". $target_cur);
 
-            $amount = $this->convertIrrToBtc($baseUri, $order_total, $signature, $baseCur);
+            $amount = $this->convertIrrToBtc($order_total, $signature, $baseCur);
 
             $params = array(
               'orderNo'          => $this->uid,
               'value'            => (float) $amount,
               'webhookUrl'       => $notification,
-              'callBackUrl'      => $callBack,
-              'allowReject'      => get_option('jeebNetwork')=="Testnet" ? false : true,
+              'callbackUrl'      => $callBack,
+              'expiration'       => get_option('jeebExpirationTime'),
+              'allowReject'      => get_option('jeebAllowRefund')=="yes" ? true : false,
               "coins"            => $target_cur,
               "allowTestNet"     => get_option('jeebNetwork')=="Testnet" ? true : false,
               "language"         => $lang
             );
 
-            $token = $this->createInvoice($baseUri, $amount, $params, $signature);
+            $token = $this->createInvoice($params, $signature);
 
-            $table_name = $wpdb->prefix.'jeeb_transactions';
-
-            $data = array(
-                'order_id' => $this->uid,
-                'buyer_email' => $this->buyerEmail,
-                'token'  => $token
-            );
-
-            $wpdb->insert($table_name, $data);
-
-            $this->redirectPayment($baseUri, $token);
+            $this->redirectPayment($token);
 
     }
 

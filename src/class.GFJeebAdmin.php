@@ -44,7 +44,7 @@ class GFJeebAdmin
         // hook for enqueuing admin styles
         add_filter('admin_enqueue_scripts', array($this, 'enqueueScripts'));
 
-        self::create_table();
+        // self::create_table();
     }
 
     /**
@@ -159,28 +159,28 @@ class GFJeebAdmin
     /**
      * creates the database table used by this plugin
      */
-    public static function create_table()
-    {
-        require_once ABSPATH.'wp-admin/includes/upgrade.php';
-
-        // Access to Wordpress Database
-        global $wpdb;
-
-        // Query for creating Keys Table
-        $sql = "CREATE TABLE IF NOT EXISTS `".$wpdb->prefix."jeeb_transactions` (
-                `id` int(11) not null auto_increment,
-                `order_id` varchar(1000) not null,
-                `token` varchar(1000) not null,
-                `buyer_email` varchar(1000) not null,
-                PRIMARY KEY (`id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;";
-
-        try {
-            // execute SQL statement
-            dbDelta($sql);
-        } catch (\Exception $e) {
-            error_log('[Error] In GFJeebAdmin::create_table() function on line ' . $e->getLine() . ', with the error "' . $e->getMessage() . '" .');
-            throw $e;
-        }
-    }
+    // public static function create_table()
+    // {
+    //     require_once ABSPATH.'wp-admin/includes/upgrade.php';
+    //
+    //     // Access to Wordpress Database
+    //     global $wpdb;
+    //
+    //     // Query for creating Keys Table
+    //     $sql = "CREATE TABLE IF NOT EXISTS `".$wpdb->prefix."jeeb_transactions` (
+    //             `id` int(11) not null auto_increment,
+    //             `order_id` varchar(1000) not null,
+    //             `token` varchar(1000) not null,
+    //             `buyer_email` varchar(1000) not null,
+    //             PRIMARY KEY (`id`)
+    //             ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;";
+    //
+    //     try {
+    //         // execute SQL statement
+    //         dbDelta($sql);
+    //     } catch (\Exception $e) {
+    //         error_log('[Error] In GFJeebAdmin::create_table() function on line ' . $e->getLine() . ', with the error "' . $e->getMessage() . '" .');
+    //         throw $e;
+    //     }
+    // }
 }

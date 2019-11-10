@@ -46,11 +46,7 @@ if (false === defined('GFJEEB_PLUGIN_ROOT')) {
     } else {
         define('GFJEEB_PLUGIN_VERSION', '2.0.2');
     }
-
-    // custom fields
-    define('GFJEEB_REDIRECT_URL', 'jeebRedirectURL');
-    define('GFJEEB_NETWORK', 'jeebNetwork');
-    define('GFJEEB_SIGNATURE', 'jeebSignature');
+    
 }
 
 /**
@@ -102,12 +98,22 @@ function gravityforms_jeeb_failed_requirements()
         $errors[] = 'The Jeeb payment plugin requires the GMP or BC Math extension for PHP in order to function. Please contact your web server administrator for assistance.';
     }
 
+    // Curl required
+    if (!EDD_Jeeb_checkCurl()) {
+        $errors[] = 'cUrl needs to be installed/enabled for Jeeb plugin for Easy Digital Downloads to function';
+    }
+
     if (false === empty($errors)) {
         $imploded = implode("<br><br>\n", $errors);
         br_trigger_error($imploded, E_USER_ERROR);
     } else {
         return false;
     }
+}
+
+function EDD_Jeeb_checkCurl()
+{
+    return function_exists('curl_version');
 }
 
 // instantiate the plug-in

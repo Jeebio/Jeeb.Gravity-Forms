@@ -410,6 +410,26 @@ class GFJeebPlugin
     }
 }
 
+define("PLUGIN_NAME", 'e-commerce');
+define("PLUGIN_VERSION", '3.0');
+define("BASE_URL", 'https://core.jeeb.io/api/');
+
+function confirm_payment($signature, $options = array())
+{
+    $post = json_encode($options);
+    $ch = curl_init(BASE_URL . 'payments/' . $signature . '/confirm/');
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        'Content-Type:application/json',
+        'User-Agent:' . PLUGIN_NAME . '/' . PLUGIN_VERSION
+    ));
+    $result = curl_exec($ch);
+    $data = json_decode($result, true);
+    return (bool) $data['result']['isConfirmed'];
+}
+
 function jeeb_callback()
 {
     try {
@@ -417,83 +437,52 @@ function jeeb_callback()
 
         $postdata = file_get_contents("php://input");
         $json = json_decode($postdata, true);
+        $signature = $json['signature'];
 
         if($json['signature']==get_option("jeebSignature")){
-          if($json['orderNo']){
-            error_log("hey".$json['orderNo']);
-            $table_name = $wpdb->prefix.'jeeb_transactions';
+          error_log("Entered Jeeb-Notification");
+          if ( $json['stateId']== 2 ) {
+            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
+            error_log('Object : '.print_r($json, true));
+          }
+          else if ( $json['stateId']== 3 ) {
+            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
+            error_log('Object : '.print_r($json, true));
 
-            $orderNo = $json['orderNo'];
+          }
+          else if ( $json['stateId']== 4 ) {
+            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
+            error_log('Object : '.print_r($json, true));
+            $data = array(
+              "token" => $json["token"]
+            );
 
-            $row = $wpdb->get_results("SELECT * FROM {$table_name} WHERE `order_id` = '".$orderNo."'", ARRAY_A);
-            error_log("Buyer Email : ".$row[0]['buyer_email']);
-            $buyer_email = $row[0]['buyer_email'];
+            $isConfirmed = confirm_payment($signature, $data);
 
-            $network_uri = "https://core.jeeb.io/api/" ;
-
-
-            error_log("Entered Jeeb-Notification");
-            if ( $json['stateId']== 2 ) {
-              error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-              error_log('Object : '.print_r($json, true));
-            }
-            else if ( $json['stateId']== 3 ) {
-              error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-              error_log('Object : '.print_r($json, true));
-
-            }
-            else if ( $json['stateId']== 4 ) {
-              error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-              $data = array(
-                "token" => $json["token"]
-              );
-
-              $data_string = json_encode($data);
-              $api_key = get_option("jeebSignature");
-              $url = $network_uri.'payments/' . $api_key . '/confirm';
-              error_log("Signature:".$api_key." Base-Url:".$network_uri." Url:".$url);
-
-              $ch = curl_init($url);
-              curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-              curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
-              curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-              curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                  'Content-Type: application/json',
-                  'Content-Length: ' . strlen($data_string))
-              );
-
-              $result = curl_exec($ch);
-              $data = json_decode( $result , true);
-              error_log("data = ".var_export($data, TRUE));
-
-
-              if($data['result']['isConfirmed']){
-                error_log('Payment confirmed by jeeb');
-
-              }
-              else {
-                error_log('Payment confirmation rejected by jeeb');
-              }
-            }
-            else if ( $json['stateId']== 5 ) {
-              error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
+            if($isConfirmed){
+              error_log('Payment confirmed by jeeb');
 
             }
-            else if ( $json['stateId']== 6 ) {
-              error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
+            else {
+              error_log('Payment confirmation rejected by jeeb');
+            }
+          }
+          else if ( $json['stateId']== 5 ) {
+            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
 
-            }
-            else if ( $json['stateId']== 7 ) {
-              error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
+          }
+          else if ( $json['stateId']== 6 ) {
+            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
 
-            }
-            else{
-              error_log('Cannot read state id sent by Jeeb');
-            }
+          }
+          else if ( $json['stateId']== 7 ) {
+            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
+
+          }
+          else{
+            error_log('Cannot read state id sent by Jeeb');
+          }
         }
-    }
-
-
     } catch (\Exception $e) {
         error_log('[Error] In GFJeebPlugin::jeeb_callback() function on line ' . $e->getLine() . ', with the error "' . $e->getMessage() . '".');
         throw $e;
