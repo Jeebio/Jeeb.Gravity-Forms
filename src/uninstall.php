@@ -18,8 +18,3 @@ delete_option('jeebBch');
 delete_option('jeebEth');
 delete_option('jeebTestBtc');
 delete_option('jeebLang');
-
-global $wpdb;
-     $table_name = "jeeb_transactions";
-     $sql = "DROP TABLE IF EXISTS $table_name;";
-     $wpdb->query($sql);
