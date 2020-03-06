@@ -56,24 +56,28 @@ $this->frm->jeebBase == "toman" ? $btoman = "selected" : $btoman = "";
 		</tr>
 
 		<?php
-$btc = $ltc = $eth = $bch = $test_btc = "";
+$btc = $doge = $ltc = $eth = $bch = $test_btc = $test_doge = $test_ltc = "";
 $this->frm->jeebBtc == "btc" ? $btc = "checked" : $btc = "";
+$this->frm->jeebDoge == "doge" ? $doge = "checked" : $doge = "";
 $this->frm->jeebLtc == "ltc" ? $ltc = "checked" : $ltc = "";
 $this->frm->jeebEth == "eth" ? $eth = "checked" : $eth = "";
 $this->frm->jeebBch == "bch" ? $bch = "checked" : $bch = "";
 
 $this->frm->jeebTestBtc == "test-btc" ? $test_btc = "checked" : $test_btc = "";
+$this->frm->jeebTestDoge == "test-doge" ? $test_doge = "checked" : $test_doge = "";
 $this->frm->jeebTestLtc == "test-ltc" ? $test_ltc = "checked" : $test_ltc = "";
 ?>
 
 		<tr valign="top">
-      <th>Payable Currencies</th>
+      	<th>Payable Currencies</th>
 			<td>
 				<input type="checkbox" name="jeebBtc" value="btc" <?php echo $btc; ?>/>BTC<br>
+				<input type="checkbox" name="jeebDoge" value="doge" <?php echo $btc; ?>/>DOGE<br>
 				<input type="checkbox" name="jeebLtc" value="ltc" <?php echo $ltc; ?>/>LTC<br>
 				<input type="checkbox" name="jeebEth" value="eth" <?php echo $eth; ?>/>ETH<br>
 				<input type="checkbox" name="jeebBch" value="bch" <?php echo $bch; ?>/>BCH<br>
 				<input type="checkbox" name="jeebTestBtc" value="test-btc" <?php echo $test_btc; ?>/>TEST-BTC<br>
+				<input type="checkbox" name="jeebTestDoge" value="test-doge" <?php echo $test_doge; ?>/>TEST-DOGE<br>
 				<input type="checkbox" name="jeebTestLtc" value="test-ltc" <?php echo $test_ltc; ?>/>TEST-LTC<br>
 				<p><small>The currencies which users can use for payments.</small></p>
 			</td>
@@ -90,7 +94,7 @@ $this->frm->jeebNetwork == "Testnet" ? $test = "selected" : $test = "";
 					<option value="Livenet" <?php echo $live; ?>>Livenet</option>
 					<option value="Testnet" <?php echo $test; ?>>Testnet</option>
 				</select>
-				<p><small>Allows testnets such as TBTC to get processed.</small></p>
+				<p><small>Allows testnets such as TEST-BTC to get processed.</small></p>
 			</td>
 		</tr>
 		<?php

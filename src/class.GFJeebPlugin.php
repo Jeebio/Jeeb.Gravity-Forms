@@ -410,8 +410,8 @@ class GFJeebPlugin
     }
 }
 
-define("PLUGIN_NAME", 'e-commerce');
-define("PLUGIN_VERSION", '3.0');
+define("PLUGIN_NAME", 'gravityforms');
+define("PLUGIN_VERSION", '3.2');
 define("BASE_URL", 'https://core.jeeb.io/api/');
 
 function confirm_payment($signature, $options = array())
