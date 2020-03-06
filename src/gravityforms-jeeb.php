@@ -4,8 +4,7 @@
 Plugin Name: Gravity Forms Jeeb Payments
 Plugin URI:  https://github.com/jeeb/gravityforms-plugin
 Description: Integrates Gravity Forms with Jeeb payment gateway.
-Version:     2.0.2
-Author:      Rich Morgan & Alex Leitner (integrations@jeeb.com)
+Version:     3.2.0
 Author URI:  https://www.jeeb.com
 */
 
