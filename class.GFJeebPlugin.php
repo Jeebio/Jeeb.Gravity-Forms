@@ -1,11 +1,7 @@
 <?php
 
+require GFJEEB_PLUGIN_ROOT . 'includes/functions.php';
 
-/**
- * Custom exception classes
- */
-class GFJeebException extends Exception {}
-class GFJeebCurlException extends Exception {}
 
 /**
  * Class for managing the plugin
@@ -15,7 +11,7 @@ class GFJeebPlugin
     public $urlBase;                  // string: base URL path to files in plugin
     public $options;                  // array of plugin options
 
-    protected $txResult = null;       // Jeeb transaction results
+    protected $transactionMeta = null;       // Jeeb transaction results
 
     /**
      * Static method for getting the instance of this singleton object
@@ -86,20 +82,20 @@ class GFJeebPlugin
                 $data['is_valid'] = false;
 
                 $formData->buyerName['failed_validation']  = true;
-                $formData->buyerName['validation_message'] = $this->getErrMsg(GFJEEB_ERROR_ALREADY_SUBMITTED);
+                $formData->buyerName['validation_message'] = $this->getErrMsg('GFJEEB_ERROR_ALREADY_SUBMITTED');
             } else if ($formData->isLastPage()) {
                 // make that this is the last page of the form
                 if (!$formData) {
                     $data['is_valid'] = false;
 
                     $formData->buyerName['failed_validation']  = true;
-                    $formData->buyerName['validation_message'] = $this->getErrMsg(GFJEEB_ERROR_NO_AMOUNT);
+                    $formData->buyerName['validation_message'] = $this->getErrMsg('GFJEEB_ERROR_NO_AMOUNT');
                 } else {
                     if ($formData->total > 0) {
                         $data = $this->processSinglePayment($data, $formData);
                     } else {
                         $formData->buyerName['failed_validation']  = true;
-                        $formData->buyerName['validation_message'] = $this->getErrMsg(GFJEEB_ERROR_NO_AMOUNT);
+                        $formData->buyerName['validation_message'] = $this->getErrMsg('GFJEEB_ERROR_NO_AMOUNT');
                     }
                 }
             }
@@ -118,25 +114,31 @@ class GFJeebPlugin
      * @param array $form
      * @return boolean
      */
+    /**
+     * hasFormBeenProcessed
+     *
+     * @param  mixed $form
+     * @return void
+     */
     protected function hasFormBeenProcessed($form)
     {
         global $wpdb;
 
         $unique_id = RGFormsModel::get_form_unique_id($form['id']);
-        $sql       = "select lead_id from {$wpdb->prefix}rg_lead_meta where meta_key='gfjeeb_unique_id' and meta_value = %s";
-        $lead_id   = $wpdb->get_var($wpdb->prepare($sql, $unique_id));
+        $sql       = "select entry_id from {$wpdb->prefix}gf_entry_meta where meta_key='gfjeeb_unique_id' and meta_value = %s";
+        $entry_id   = $wpdb->get_var($wpdb->prepare($sql, $unique_id));
 
-        return !empty($lead_id);
+        return !empty($entry_id);
     }
 
-    /**
-     * get customer ID
-     * @return string
-     */
-    protected function getCustomerID()
-    {
-        return $this->options['customerID'];
-    }
+    // /**
+    //  * get customer ID
+    //  * @return string
+    //  */
+    // protected function getCustomerID()
+    // {
+    //     return $this->options['customerID'];
+    // }
 
     /**
      * process regular one-off payment
@@ -154,32 +156,32 @@ class GFJeebPlugin
                 throw new \Exception('An error occurred in the Jeeb Payment plugin: Could not create a new GFJeebPayment object.');
             }
 
-            $jeeb->uid                = uniqid();
-            $this->uid                = $jeeb->uid;
-            $jeeb->total              = $formData->total;
-            $jeeb->buyerEmail        = $formData->buyerEmail;
+            $form_submit_uid  = GFFormsModel::get_form_unique_id($data['form']['id']);
 
-            $this->txResult = array (
-                'payment_gateway'    => 'gfjeeb',
-                'gfjeeb_unique_id' => GFFormsModel::get_form_unique_id($data['form']['id']),
+            $jeeb->uid        = $form_submit_uid;
+            $this->uid        = $jeeb->uid;
+            $jeeb->total      = $formData->total;
+            $jeeb->buyerEmail = $formData->buyerEmail;
+
+            $this->transactionMeta = array(
+                'payment_gateway'  => 'gfjeeb',
             );
 
-            $response = $jeeb->processPayment();
+            $jeeb->processPayment();
 
-            $this->txResult['payment_status']   = 'New';
-            $this->txResult['date_created']     = date('Y-m-d H:i:s');
-            $this->txResult['payment_date']     = null;
-            $this->txResult['payment_amount']   = $jeeb->total;
-            $this->txResult['transaction_id']   = $jeeb->uid;
-            $this->txResult['transaction_type'] = 1;
-            $this->txResult['currency']         = GFCommon::get_currency();
-            $this->txResult['status']           = 'Active';
-            $this->txResult['payment_method']   = 'Bitcoin';
-            $this->txResult['is_fulfilled']     = '0';
-
-        } catch (GFJeebException $e) {
+            $this->transactionMeta['payment_status']   = 'Pending';
+            $this->transactionMeta['date_created']     = date('Y-m-d H:i:s');
+            $this->transactionMeta['payment_date']     = null;
+            $this->transactionMeta['payment_amount']   = $jeeb->total;
+            $this->transactionMeta['transaction_id']   = $jeeb->uid;
+            $this->transactionMeta['transaction_type'] = 1;
+            $this->transactionMeta['currency']         = GFCommon::get_currency();
+            $this->transactionMeta['status']           = 'Active';
+            $this->transactionMeta['payment_method']   = 'Jeeb';
+            $this->transactionMeta['is_fulfilled']     = '0';
+        } catch (Exception $e) {
             $data['is_valid'] = false;
-            $this->txResult   = array('payment_status' => 'Failed',);
+            $this->transactionMeta   = array('payment_status' => 'Failed',);
 
             error_log('[ERROR] In GFJeebPlugin::processSinglePayment(): ' . $e->getMessage());
 
@@ -206,8 +208,8 @@ class GFJeebPlugin
             throw new \Exception('An error occurred in the Jeeb Payment plugin: Could not create a new GFJeebFormData object.');
         }
 
-        if (false === empty($this->txResult)) {
-            foreach ($this->txResult as $key => $value) {
+        if (false === empty($this->transactionMeta)) {
+            foreach ($this->transactionMeta as $key => $value) {
                 switch ($key) {
                     case 'authcode':
                         gform_update_meta($entry['id'], $key, $value);
@@ -218,21 +220,25 @@ class GFJeebPlugin
                 }
             }
 
-            if (class_exists('RGFormsModel') == true) {
-                RGFormsModel::update_lead($entry);
-            } elseif (class_exists('GFAPI') == true) {
+            // if (class_exists('RGFormsModel') == true) {
+            //     RGFormsModel::update_lead($entry);
+            // } else
+            if (class_exists('GFAPI') == true) {
                 GFAPI::update_entry($entry);
             } else {
                 throw new Exception('[ERROR] In GFJeebPlugin::gformAfterSubmission(): GFAPI or RGFormsModel won\'t update lead.');
             }
 
             // record entry's unique ID in database
-            $unique_id = RGFormsModel::get_form_unique_id($form['id']);
+            // $unique_id = RGFormsModel::get_form_unique_id($form['id']);
 
-            gform_update_meta($entry['id'], 'gfjeeb_transaction_id', $unique_id);
+            gform_update_meta($entry['id'], 'gfjeeb_transaction_id', $this->transactionMeta['transaction_id']);
+
+            // Store entry ID as transient in order to use in webhook process, later
+            set_transient($this->transactionMeta['transaction_id'], $entry['id'], 3600 * 2);
 
             // record payment gateway
-            gform_update_meta($entry['id'], 'payment_gateway', 'gfjeeb');
+            // gform_update_meta($entry['id'], 'payment_gateway', 'gfjeeb');
         }
     }
 
@@ -270,7 +276,7 @@ class GFJeebPlugin
     public function gformReplaceMergeTags($text, $form, $lead, $url_encode, $esc_html, $nl2br, $format)
     {
         if ($this->hasFieldType($form['fields'], 'buyerName')) {
-            if (true === empty($this->txResult)) {
+            if (true === empty($this->transactionMeta)) {
                 // lead loaded from database, get values from lead meta
                 $transaction_id = isset($lead['transaction_id']) ? $lead['transaction_id'] : '';
                 $payment_amount = isset($lead['payment_amount']) ? $lead['payment_amount'] : '';
@@ -278,20 +284,20 @@ class GFJeebPlugin
                 $authcode       = (string) gform_get_meta($lead['id'], 'authcode');
             } else {
                 // lead not yet saved, get values from transaction results
-                $transaction_id = isset($this->txResult['transaction_id']) ? $this->txResult['transaction_id'] : '';
-                $payment_amount = isset($this->txResult['payment_amount']) ? $this->txResult['payment_amount'] : '';
-                $payment_status = isset($this->txResult['payment_status']) ? $this->txResult['payment_status'] : '';
-                $authcode       = isset($this->txResult['authcode']) ? $this->txResult['authcode'] : '';
+                $transaction_id = isset($this->transactionMeta['transaction_id']) ? $this->transactionMeta['transaction_id'] : '';
+                $payment_amount = isset($this->transactionMeta['payment_amount']) ? $this->transactionMeta['payment_amount'] : '';
+                $payment_status = isset($this->transactionMeta['payment_status']) ? $this->transactionMeta['payment_status'] : '';
+                $authcode       = isset($this->transactionMeta['authcode']) ? $this->transactionMeta['authcode'] : '';
             }
 
-            $tags = array (
+            $tags = array(
                 '{transaction_id}',
                 '{payment_amount}',
                 '{payment_status}',
                 '{authcode}'
             );
 
-            $values = array (
+            $values = array(
                 $transaction_id,
                 $payment_amount,
                 $payment_status,
@@ -342,10 +348,10 @@ class GFJeebPlugin
      */
     public function getErrMsg($errName, $useDefault = false)
     {
-        static $messages = array (
-            GFJEEB_ERROR_ALREADY_SUBMITTED => 'Payment has already been submitted and processed.',
-            GFJEEB_ERROR_NO_AMOUNT         => 'This form is missing products or totals',
-            GFJEEB_ERROR_FAIL              => 'Error processing Jeeb transaction',
+        static $messages = array(
+            'GFJEEB_ERROR_ALREADY_SUBMITTED' => 'Payment has already been submitted and processed.',
+            'GFJEEB_ERROR_NO_AMOUNT'         => 'This form is missing products or totals',
+            'GFJEEB_ERROR_FAIL'              => 'Error processing Jeeb transaction',
         );
 
         // default
@@ -411,77 +417,101 @@ class GFJeebPlugin
 }
 
 define("PLUGIN_NAME", 'gravityforms');
-define("PLUGIN_VERSION", '3.2');
-define("BASE_URL", 'https://core.jeeb.io/api/');
+define("PLUGIN_VERSION", '3.3');
+define("BASE_URL", 'https://core.jeeb.io/api/v3/');
 
-function confirm_payment($signature, $options = array())
+function confirm_payment($token, $api_key)
 {
-    $post = json_encode($options);
-    $ch = curl_init(BASE_URL . 'payments/' . $signature . '/confirm/');
+    $post = json_encode(array('token' => $token));
+
+    $ch = curl_init(BASE_URL . 'payments/seal/');
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
     curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, array(
         'Content-Type:application/json',
-        'User-Agent:' . PLUGIN_NAME . '/' . PLUGIN_VERSION
+        'X-API-Key: ' . $api_key,
+        'User-Agent:' . PLUGIN_NAME . '/' . PLUGIN_VERSION,
     ));
     $result = curl_exec($ch);
     $data = json_decode($result, true);
-    return (bool) $data['result']['isConfirmed'];
+    return (bool) $data['succeed'];
 }
 
 function jeeb_callback()
 {
+    if (!isset($_GET['jeeb_callback']) || $_GET['jeeb_callback'] != 'gfjeeb') {
+        return;
+    }
+
     try {
-        global $wpdb;
 
         $postdata = file_get_contents("php://input");
         $json = json_decode($postdata, true);
-        $signature = $json['signature'];
 
-        if($json['signature']==get_option("jeebSignature")){
-          error_log("Entered Jeeb-Notification");
-          if ( $json['stateId']== 2 ) {
-            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-            error_log('Object : '.print_r($json, true));
-          }
-          else if ( $json['stateId']== 3 ) {
-            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-            error_log('Object : '.print_r($json, true));
+        $api_key = get_jeeb_option('apiKey');
+        $payment_id = $json['orderNo'];
 
-          }
-          else if ( $json['stateId']== 4 ) {
-            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-            error_log('Object : '.print_r($json, true));
-            $data = array(
-              "token" => $json["token"]
-            );
+        // Retrieve the related entry ID that stored previously
+        $entry_id = get_transient($payment_id);
 
-            $isConfirmed = confirm_payment($signature, $data);
+        notify_log($json);
 
-            if($isConfirmed){
-              error_log('Payment confirmed by jeeb');
+        // Check for valid request
+        if (md5($api_key . $payment_id) === $_GET['hash_key']) {
 
+            error_log("Entered Jeeb-Notification");
+
+            switch ($json['state']) {
+                case 'PendingTransaction':
+                    notify_log('PendingTransaction');
+                    RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Pending transaction.');
+                    break;
+
+                case 'PendingConfirmation':
+                    notify_log('PendingConfirmation');
+
+                    if ($json['refund'] == true) {
+                        RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Payment will be rejected.');
+                    } else {
+                        RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Pending confirmation.');
+                    }
+                    break;
+
+                case 'Completed':
+                    notify_log('Completed');
+                    $is_confirmed = confirm_payment($json['token'], $api_key);
+
+                    if ($is_confirmed) {
+                        GFAPI::update_entry_property($entry_id, 'payment_status', 'Paid');
+                        RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Payment is confirmed.');
+                    } else {
+                        RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Double spending avoided.');
+                    }
+
+                    break;
+
+                case 'Rejected':
+                    notify_log('Rejected');
+
+                    GFAPI::update_entry_property($entry_id, 'payment_status', 'Refunded');
+                    RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Payment is rejected.');
+                    break;
+
+                case 'Expired':
+                    notify_log('Expired');
+                    GFAPI::update_entry_property($entry_id, 'payment_status', 'Cancelled');
+                    RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Payment is expired or canceled.');
+
+                    break;
+
+                default:
+                    RGFormsModel::add_note($entry_id, 1, 'admin', 'Jeeb: Unknown state received. Please report this incident.');
+
+                    break;
             }
-            else {
-              error_log('Payment confirmation rejected by jeeb');
-            }
-          }
-          else if ( $json['stateId']== 5 ) {
-            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-
-          }
-          else if ( $json['stateId']== 6 ) {
-            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-
-          }
-          else if ( $json['stateId']== 7 ) {
-            error_log('Order Id received = '.$json['orderNo'].' stateId = '.$json['stateId']);
-
-          }
-          else{
-            error_log('Cannot read state id sent by Jeeb');
-          }
+        } else {
+            header("HTTP/1.0 404 Not Found");
         }
     } catch (\Exception $e) {
         error_log('[Error] In GFJeebPlugin::jeeb_callback() function on line ' . $e->getLine() . ', with the error "' . $e->getMessage() . '".');
@@ -489,8 +519,9 @@ function jeeb_callback()
     }
 }
 
-function wpdocs_set_html_mail_content_type() {
-    return 'text/html';
-}
+// function wpdocs_set_html_mail_content_type()
+// {
+//     return 'text/html';
+// }
 
 add_action('init', 'jeeb_callback');
