@@ -417,7 +417,7 @@ class GFJeebPlugin
 }
 
 define("PLUGIN_NAME", 'gravityforms');
-define("PLUGIN_VERSION", '3.3');
+define("PLUGIN_VERSION", '4.0');
 define("BASE_URL", 'https://core.jeeb.io/api/v3/');
 
 function confirm_payment($token, $api_key)

@@ -12,7 +12,7 @@ class GFJeebPayment
   public $buyer_email;    // Displays Customer's EmaiL
 
   const PLUGIN_NAME = 'gravityforms';
-  const PLUGIN_VERSION = '3.4';
+  const PLUGIN_VERSION = '4.0';
   const BASE_URL = "https://core.jeeb.io/api/v3/";
 
   /**
