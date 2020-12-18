@@ -1,49 +1,72 @@
 <?php
 
 
+include GFJEEB_PLUGIN_ROOT . 'includes/functions.php';
 /**
  * Options form input fields
  */
 class GFJeebOptionsForm
 {
+    private $prefix = 'gfjeeb_';
+    public $fields = [
+        'apiKey',
+        'baseCurrency',
+        'payableCoins',
+        'allowTestnets',
+        'allowRefund',
+        'callbackUrl',
+        'expirationTime',
+        'language',
+        'webhookDebugUrl',
+    ];
 
-    public $jeebSignature    = '';
-    public $jeebRedirectURL  = '';
-    public $jeebNetwork      = '';
-    // public $jeebBase         = '';
-    // public $jeebLang         = '';
-    // public $jeebBase         = '';
-    // public $jeebBtc          = '';
-    // public $jeebXmr          = '';
-    // public $jeebXrp          = '';
-    // public $jeebBch          = '';
-    // public $jeebLtc          = '';
-    // public $jeebEth          = '';
-    // public $jeebTestBtc      = '';
-
-    /**
-     * initialise from form post, if posted
-     */
     public function __construct()
     {
-        if (self::isFormPost()) {
-            $this->jeebSignature      = self::getPostValue('jeebSignature');
-            $this->jeebRedirectURL    = self::getPostValue('jeebRedirectURL');
-            $this->jeebNetwork        = self::getPostValue('jeebNetwork');
-            $this->jeebBase           = self::getPostValue('jeebBase');
-            $this->jeebBtc            = self::getPostValue('jeebBtc');
-            $this->jeebDoge            = self::getPostValue('jeebDoge');
-            $this->jeebLtc            = self::getPostValue('jeebLtc');
-            $this->jeebXmr            = self::getPostValue('jeebXmr');
-            $this->jeebXrp            = self::getPostValue('jeebXrp');
-            $this->jeebBch            = self::getPostValue('jeebBch');
-            $this->jeebEth            = self::getPostValue('jeebEth');
-            $this->jeebTestBtc        = self::getPostValue('jeebTestBtc');
-            $this->jeebTestDoge        = self::getPostValue('jeebTestDoge');
-            $this->jeebTestLtc        = self::getPostValue('jeebTestLtc');
-            $this->jeebExpirationTime = self::getPostValue('jeebExpirationTime');
-            $this->jeebAllowRefund    = self::getPostValue('jeebAllowRefund');
-            $this->jeebLang           = self::getPostValue('jeebLang');
+        $this->defineFields();
+    }
+
+
+    /**
+     * Define form fields in class object
+     *
+     * @since       3.4.0
+     * @access      private
+     */
+    private function defineFields()
+    {
+        foreach ($this->fields as $field) {
+            if ($field != 'payableCoins') {
+                $this->{$field} = get_option($this->prefix . ucfirst($field), false);
+            } else {
+                $coins = array_keys(jeeb_available_coins_list());
+                foreach ($coins as $coin) {
+                    $this->payableCoins[$coin] = get_option($this->prefix . ucfirst($coin), false);
+                }
+            }
+        }
+    }
+
+    /**
+     * Save field values to DB
+     * 
+     * @since       3.4.0
+     * @access      public
+     */
+    public function updateFields()
+    {
+        foreach ($this->fields as $field) {
+            if ($field != 'payableCoins') {
+                $fieldValue = self::getPostValue($field);
+                update_option($this->prefix . ucfirst($field), $fieldValue);
+                $this->{$field} = $fieldValue;
+            } else {
+                $coins = array_keys($this->payableCoins);
+                foreach ($coins as $coin) {
+                    $fieldValue = self::getPostValue($coin);
+                    update_option($this->prefix . ucfirst($coin), $fieldValue);
+                    $this->payableCoins[$coin] = $fieldValue;
+                }
+            }
         }
     }
 
@@ -72,6 +95,15 @@ class GFJeebOptionsForm
         return isset($_POST[$fieldname]) ? stripslashes(trim($_POST[$fieldname])) : '';
     }
 
+    public function setTempValues()
+    {
+        foreach ($_POST as $field => $value) {
+            if (in_array($field, $this->fields)) {
+                $this->{$field} = $value;
+            }
+        }
+    }
+
     /**
      * Validate the form input, and return error messages.
      *
@@ -83,24 +115,20 @@ class GFJeebOptionsForm
      */
     public function validate()
     {
-        $errmsg = '';
+        $errMsg = '';
 
-        if (false === isset($this->jeebRedirectURL) || strlen($this->jeebRedirectURL) <= 0) {
-            $errmsg .= "# Please enter a Redirect URL.<br/>\n";
+        if (!$this->getPostValue('apiKey') || strlen($this->getPostValue('apiKey')) <= 0) {
+            $errMsg .= "# Please enter your apiKey.<br/>\n";
         }
 
-        if (false === isset($this->jeebSignature) || strlen($this->jeebSignature) <= 0) {
-            $errmsg .= "# Please enter your Signature.<br/>\n";
+        if (!$this->getPostValue('baseCurrency')) {
+            $errMsg .= "# Please select a base currency.<br/>\n";
         }
 
-        if (false === isset($this->jeebBase) || strlen($this->jeebBase) <= 0) {
-            $errmsg .= "# Please select a base currency.<br/>\n";
-        }
+        if (false === isset($this->expirationTime) || $this->expirationTime < 15 || $this->expirationTime > 15)
+            $this->expirationTime = 15;
 
-        if(false === isset($this->jeebExpirationTime)||$this->jeebExpirationTime<15||$this->jeebExpirationTime>15)
-          $this->jeebExpirationTime=15;
-
-        return $errmsg;
+        return $errMsg;
     }
 }
 
@@ -125,7 +153,7 @@ class GFJeebOptionsAdmin
         $this->menuPage  = $menuPage;
         $this->scriptURL = $scriptURL;
 
-        wp_enqueue_script('jquery');
+        // wp_enqueue_script('jquery');
     }
 
     /**
@@ -143,51 +171,17 @@ class GFJeebOptionsAdmin
         if ($this->frm->isFormPost()) {
             check_admin_referer('save', $this->menuPage . '_wpnonce');
 
-            $errmsg = $this->frm->validate();
+            $errMsg = $this->frm->validate();
 
-            if (true === empty($errmsg)) {
-                update_option('jeebSignature', $this->frm->jeebSignature);
-                update_option('jeebRedirectURL', $this->frm->jeebRedirectURL);
-                update_option('jeebNetwork', $this->frm->jeebNetwork);
-                update_option('jeebBase', $this->frm->jeebBase);
-                update_option('jeebLang', $this->frm->jeebLang);
-                update_option('jeebBtc', $this->frm->jeebBtc);
-                update_option('jeebDoge', $this->frm->jeebDoge);
-                update_option('jeebLtc', $this->frm->jeebLtc);
-                update_option('jeebXmr', $this->frm->jeebXmr);
-                update_option('jeebXrp', $this->frm->jeebXrp);
-                update_option('jeebEth', $this->frm->jeebEth);
-                update_option('jeebBch', $this->frm->jeebBch);
-                update_option('jeebTestBtc', $this->frm->jeebTestBtc);
-                update_option('jeebTestDoge', $this->frm->jeebTestDoge);
-                update_option('jeebTestLtc', $this->frm->jeebTestLtc);
-                update_option('jeebExpirationTime', $this->frm->jeebExpirationTime);
-                update_option('jeebAllowRefund', $this->frm->jeebAllowRefund);
-
-
+            if (true === empty($errMsg)) {
+                $this->frm->updateFields();
                 $this->plugin->showMessage(__('Options saved.'));
             } else {
-                $this->plugin->showError($errmsg);
+                $this->frm->setTempValues();
+                $this->plugin->showError($errMsg);
             }
         } else {
-            // initialise form from stored options
-            $this->frm->jeebNetwork         = get_option('jeebNetwork');
-            $this->frm->jeebRedirectURL     = get_option('jeebRedirectURL');
-            $this->frm->jeebSignature       = get_option('jeebSignature');
-            $this->frm->jeebBase            = get_option('jeebBase');
-            $this->frm->jeebLang            = get_option('jeebLang');
-            $this->frm->jeebBtc             = get_option('jeebBtc');
-            $this->frm->jeebDoge             = get_option('jeebDoge');
-            $this->frm->jeebLtc             = get_option('jeebLtc');
-            $this->frm->jeebXmr             = get_option('jeebXmr');
-            $this->frm->jeebXrp             = get_option('jeebXrp');
-            $this->frm->jeebEth             = get_option('jeebEth');
-            $this->frm->jeebBch             = get_option('jeebBch');
-            $this->frm->jeebTestBtc         = get_option('jeebTestBtc');
-            $this->frm->jeebTestDoge         = get_option('jeebTestDoge');
-            $this->frm->jeebTestLtc         = get_option('jeebTestLtc');
-            $this->frm->jeebExpirationTime  = get_option('jeebExpirationTime');
-            $this->frm->jeebAllowRefund     = get_option('jeebAllowRefund');
+
         }
 
         require GFJEEB_PLUGIN_ROOT . 'views/admin-settings.php';
